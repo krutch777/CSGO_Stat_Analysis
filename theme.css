@@ -1,0 +1,122 @@
+body {
+  padding-top: 33px;
+  font-size: 18px;
+  background-color: white;
+  color: black;
+}
+
+.titleimg {
+  width: 70%;
+  z-index: 0;
+}
+
+h2 {
+  font-size: 2.4vw;
+}
+
+h3 {
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.conclusion {
+  font-size: 20px;
+}
+
+.jptrstyle {
+  border: 0px solid #cfcfcf !important;
+  padding: 0;
+  border-radius: 4px;
+  background-color: #f7f7f7;
+}
+
+.pull-right {
+  width: 30vw;
+  height: auto;
+  margin-left: 1.8vw;
+  margin-bottom: 2vh;
+  border-radius: 4px;
+}
+
+.deskimg {
+  display: inline;
+}
+
+.mobimg {
+  display: none;
+}
+
+th, tr, td {
+padding-top: 10px;
+padding-bottom: 10px;
+border-left: 0;
+border-right: 0;
+border-left-color: black;
+}
+
+td {
+  border-top: 10;
+  border-bottom: 10;
+  border-left: 0;
+  border-right: 0;
+}
+
+thead {
+  background-color: black;
+  color: white;
+  border-bottom: 0;
+}
+
+.tr-top {
+  border-bottom-color: black;
+}
+
+th:first-child {
+  padding-left: 20px;
+  padding-right: 0;
+}
+
+tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+table {
+  padding: 100;
+  padding-left: 10;
+  width: 100%;
+  border-radius: 4px;
+  border-color: black
+}
+
+.output {
+  padding: 14;
+  padding-bottom: 12;
+  padding-left: 16;
+  padding-right: 16;
+}
+
+@media (max-width:701px) {
+
+  .titleimg {
+    width: 90%;
+    z-index: 0;
+  }
+
+  h2 {
+    font-size: 22px;
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  .deskimg {
+    display: none;
+  }
+
+  .mobimg {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 4px;
+  }
+
+}

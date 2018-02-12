@@ -1,0 +1,985 @@
+<html>
+
+<head>
+  <title>eSports Statistical Analysis Tutorial</title>
+  <link rel="shortcut icon" type="image/png" href="favicon.ico"/>
+</head>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<link rel="stylesheet" href="code.css">
+<link rel="stylesheet" href="theme.css">
+<script src="highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<body>
+<center><img src="csgologo.svg" alt="Counter-Strike Global Offensive Logo" class="titleimg"></center>
+<center><h2>eSports Statistical Analysis Tutorial Using Python and Pandas</h2></center>
+
+<div class="container" id="notebook-container"><br/>
+
+<h3>Introduction To eSports and Counter-Strike</h3>
+eSports is a synonym for competitive gaming. Competitive gaming has always been an important part of video game culture but is just now gaining recognition as a legitimate professional mainstream sport.
+<br/><br/>The earliest recorded official video game competition took place in 1972 at Stanford University featuring the highly acclaimed multiplayer arcade game, Spacewar. The event gained the attention of the video game industry despite being small and limited only to Stanford students. Video game hardware and software companies saw income potential and started hosting competitions of their own.
+<br/><br/>Fast forwarding to today, eSports generated $696 million in revenue in 2017 alone, and its yearly revenue is expected to grow to $1.4 billion in 2020. Revenue is generated through tournament audience admission, game developer sponsorships, tournament entry fees, and advertising contracts. In 2017, there were 191 million frequent viewers and 194 million occasional/one-time viewers. Maximum concurrent viewership has exceeded 2.3 million. Competitive gaming is particularly popular in North America, China, Sweden, and South Korea. Tournaments are viewable via Twitch, ESPN, and other online streaming platforms.
+<br/><br class="mobimg"/><img src="csgameplay.jpg" alt="Counter-Strike Gameplay" class="mobimg"><br/>
+<img src="csgameplay.jpg" alt="Counter-Strike Gameplay" class="pull-right deskimg">This tutorial focuses on analyzing statistics of Counter-Strike Global Offensive, a popular competitive first-person shooter video game. We will perform data analysis on important first-person shooter statistics such as match wins/losses, kill/death ratios, and kill differentials of various players. These statistics can be used to help construct teams with a high likelihood of winning with a relatively low operation cost. Statistical based team optimization has been utilized by sports team management professionals for quite some time. In 2002, the Oakland Athletics made the first noteworthy use of these techniques. Increased public interest in the subject was generated through the <a href="https://www.amazon.com/Moneyball-Art-Winning-Unfair-Game/dp/0393324818">2003 release of the book Moneyball</a> and its <a href="http://www.imdb.com/title/tt1210166/">2011 film adaption</a>.
+<br/><br/>All data will scraped and parsed from <a href="https://www.hltv.org/stats">HLTV</a>, one the gaming community’s most regarded media groups.
+<br/><br/>
+
+<h3>Preparation</h3>
+This tutorial utilizes Jupyter, an interactive computing notebook environment for Python. Jupyter provides a rich GUI with input and output history, making it ideal for data science related tasks. Jupyter is most easily accessed through a portable cross-platform computing environment called Docker. Docker includes all tools needed to perform the tasks described in this tutorial including a data analysis toolkit called Pandas, an HTML parser called Beautiful Soup, and a machine learning library called SKLearn. <a href="https://docs.docker.com/engine/installation/#desktop">Instructions for installing Docker can be found here</a>.
+<br/><br/>Once installed, Docker will create a shortcut to an application called Anaconda on your desktop. Launch Anaconda and open Jupyter through the application manager. Click File > New Notebook > Python 3 to create a new workspace.<br/><br/>
+Import all necessary libraries into your newly created workbook
+<br/><br/>
+<pre class="jptrstyle"><code class="python">import math
+import re as re
+import requests
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from bs4 import BeautifulSoup as bs
+from sklearn import svm
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import learning_curve
+</code></pre><br/>
+
+<h3>Data Scraping and Sanitization</h3>
+
+We will scrape team information from an HTML table, put it into a Pandas data frame, and sanitize it. A data frame is a Pandas construct that holds structured information for easy querying and analysis of information.<br/><br/>
+Python has built-in networking functionality that allows us to send HTTP requests and retrieve raw HTML data back in the form of a string. An HTML parser called Beautiful Soup will take the raw HTML data and convert the table on the given page to a format readable by Pandas. The data then gets passed into the Pandas read_html function and a new data frame is generated. Data frame previews in this tutorial will be limited to 15 rows for the sake of brevity.<br/><br/>
+Everything works properly except for the extraction of country names. HLTV's table presents country data in the form of a flag image instead of plain text. Fortunately, <a href="https://regexone.com/">regex</a> allows us to pull the text of an HTML image tag’s alternate property which contains plaintext country names.<br/><br/>
+We will perform a preliminary sanitation by removing Tyloo since they play exclusively with low performing teams. This anomaly causes massive data skews and would ruin the integrity of some of our data analyses.
+<br/><br/><pre class="jptrstyle"><code class="python"># Get the data
+r = requests.get("https://www.hltv.org/stats/teams")
+
+# Create a pandas with pulled data
+root = bs(r.content, "html.parser")
+root.prettify()
+table = (str)(root.find("table"))
+teams = pd.read_html(table, header=0)[0]
+
+# Pull the country data out of the table and put into our dataframe
+table = table.strip("\\n")
+countries = (re.findall('title="(.+)"/>', table))
+teams['Country'] = pd.Series(countries)
+
+# Clean up columns
+teams.columns = ['Team', 'Maps', 'K/D Differential', 'K/D', 'Rating', 'Country']
+teams = teams[['Team', 'Country', 'Maps', 'K/D Differential', 'K/D', 'Rating']]
+
+# Delete Tyloo from dataframe for reasons mentioned above
+teams = teams.drop([0])
+
+# Get a series with all team names
+teamlist = teams[teams.columns[0]]
+
+# Display resultant panda
+teams</code></pre><br/>
+
+<table border="1">
+  <thead class="thead-inverse">
+    <tr style="text-align: right;" class="tr-top">
+      <th></th>
+      <th>Team</th>
+      <th>Country</th>
+      <th>Maps</th>
+      <th>K/D Differential</th>
+      <th>K/D</th>
+      <th>Rating</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>1</th>
+      <td>Space Soldiers</td>
+      <td>Turkey</td>
+      <td>623</td>
+      <td>5117</td>
+      <td>1.10</td>
+      <td>1.06</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>FaZe</td>
+      <td>Europe</td>
+      <td>451</td>
+      <td>2302</td>
+      <td>1.06</td>
+      <td>1.06</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>NiP</td>
+      <td>Sweden</td>
+      <td>1232</td>
+      <td>11763</td>
+      <td>1.12</td>
+      <td>1.06</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>Kinguin</td>
+      <td>Poland</td>
+      <td>551</td>
+      <td>3392</td>
+      <td>1.07</td>
+      <td>1.05</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>Astralis</td>
+      <td>Denmark</td>
+      <td>449</td>
+      <td>3504</td>
+      <td>1.09</td>
+      <td>1.05</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>Luminosity</td>
+      <td>Brazil</td>
+      <td>573</td>
+      <td>3828</td>
+      <td>1.08</td>
+      <td>1.05</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>G2</td>
+      <td>France</td>
+      <td>657</td>
+      <td>1789</td>
+      <td>1.03</td>
+      <td>1.05</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>Titan</td>
+      <td>France</td>
+      <td>484</td>
+      <td>1269</td>
+      <td>1.03</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>TSM</td>
+      <td>Denmark</td>
+      <td>504</td>
+      <td>2863</td>
+      <td>1.07</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>OpTic</td>
+      <td>North America</td>
+      <td>467</td>
+      <td>2126</td>
+      <td>1.05</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>Liquid</td>
+      <td>United States</td>
+      <td>705</td>
+      <td>3398</td>
+      <td>1.06</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>Virtus.pro</td>
+      <td>Poland</td>
+      <td>1077</td>
+      <td>3677</td>
+      <td>1.04</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>HellRaisers</td>
+      <td>CIS</td>
+      <td>985</td>
+      <td>3329</td>
+      <td>1.04</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>EnVyUs</td>
+      <td>France</td>
+      <td>828</td>
+      <td>3282</td>
+      <td>1.05</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>fnatic</td>
+      <td>Sweden</td>
+      <td>1075</td>
+      <td>7897</td>
+      <td>1.09</td>
+      <td>1.04</td>
+    </tr>
+  </tbody>
+</table><br/>
+
+Repeat this process on HLTV’s player list. Players that are not in the list of HLTV's top 10 ranked teams can be discarded since they are not needed for our purposes. We will sort the data frame by team name so players from the same team are grouped together.
+
+<br/><br/><pre class="jptrstyle"><code class="python"># Get the data
+r = requests.get("https://www.hltv.org/stats/players")
+
+# Create a pandas with pulled data
+root = bs(r.content, "html.parser")
+root.prettify()
+
+# Pull the player data out of the table and put into our dataframe
+table = (str)(root.find("table"))
+players = pd.read_html(table, header=0)[0]
+
+# An array containing a list of top 10 teams (according to HLTV's critically acclaimed ranking system)
+topTeams = ['SK', 'FaZe', 'Astralis', 'NiP', 'Cloud9', 'G2', 'North', 'Virtus.pro', 'fnatic', 'Liquid']
+
+# Discard player information for anyone not listed in the top 10 teams
+players = players[players['Team'].isin(topTeams)]
+
+players = players.sort_values('Team')
+players.columns = ['Player', 'Team', 'Maps', 'K/D Differential', 'K/D', 'Rating']
+
+# Display resultant panda
+players
+</code></pre><br/>
+<table border="1" class="dataframe">
+  <thead class="thead-inverse">
+    <tr style="text-align: right;" class="tr-top">
+      <th></th>
+      <th>Player</th>
+      <th>Team</th>
+      <th>Maps</th>
+      <th>K/D&nbsp;Differential</th>
+      <th>K/D</th>
+      <th>Rating</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>129</th>
+      <td>Kjaerbye</td>
+      <td>Astralis</td>
+      <td>893</td>
+      <td>1686</td>
+      <td>1.11</td>
+      <td>1.07</td>
+    </tr>
+    <tr>
+      <th>19</th>
+      <td>device</td>
+      <td>Astralis</td>
+      <td>1012</td>
+      <td>3942</td>
+      <td>1.24</td>
+      <td>1.16</td>
+    </tr>
+    <tr>
+      <th>293</th>
+      <td>gla1ve</td>
+      <td>Astralis</td>
+      <td>855</td>
+      <td>333</td>
+      <td>1.02</td>
+      <td>1.00</td>
+    </tr>
+    <tr>
+      <th>227</th>
+      <td>Xyp9x</td>
+      <td>Astralis</td>
+      <td>1189</td>
+      <td>1528</td>
+      <td>1.08</td>
+      <td>1.03</td>
+    </tr>
+    <tr>
+      <th>72</th>
+      <td>dupreeh</td>
+      <td>Astralis</td>
+      <td>1132</td>
+      <td>2756</td>
+      <td>1.14</td>
+      <td>1.09</td>
+    </tr>
+    <tr>
+      <th>116</th>
+      <td>Stewie2K</td>
+      <td>Cloud9</td>
+      <td>629</td>
+      <td>943</td>
+      <td>1.08</td>
+      <td>1.07</td>
+    </tr>
+    <tr>
+      <th>177</th>
+      <td>RUSH</td>
+      <td>Cloud9</td>
+      <td>682</td>
+      <td>882</td>
+      <td>1.08</td>
+      <td>1.04</td>
+    </tr>
+    <tr>
+      <th>119</th>
+      <td>tarik</td>
+      <td>Cloud9</td>
+      <td>759</td>
+      <td>1296</td>
+      <td>1.10</td>
+      <td>1.07</td>
+    </tr>
+    <tr>
+      <th>113</th>
+      <td>Skadoodle</td>
+      <td>Cloud9</td>
+      <td>836</td>
+      <td>2310</td>
+      <td>1.18</td>
+      <td>1.08</td>
+    </tr>
+    <tr>
+      <th>104</th>
+      <td>autimatic</td>
+      <td>Cloud9</td>
+      <td>658</td>
+      <td>1324</td>
+      <td>1.11</td>
+      <td>1.08</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>NiKo</td>
+      <td>FaZe</td>
+      <td>740</td>
+      <td>2628</td>
+      <td>1.20</td>
+      <td>1.17</td>
+    </tr>
+    <tr>
+      <th>27</th>
+      <td>GuardiaN</td>
+      <td>FaZe</td>
+      <td>1060</td>
+      <td>3998</td>
+      <td>1.23</td>
+      <td>1.15</td>
+    </tr>
+    <tr>
+      <th>409</th>
+      <td>karrigan</td>
+      <td>FaZe</td>
+      <td>1127</td>
+      <td>-891</td>
+      <td>0.96</td>
+      <td>0.95</td>
+    </tr>
+    <tr>
+      <th>50</th>
+      <td>olofmeister</td>
+      <td>FaZe</td>
+      <td>1015</td>
+      <td>2921</td>
+      <td>1.17</td>
+      <td>1.11</td>
+    </tr>
+    <tr>
+      <th>103</th>
+      <td>rain</td>
+      <td>FaZe</td>
+      <td>765</td>
+      <td>1227</td>
+      <td>1.09</td>
+      <td>1.08</td>
+    </tr>
+  </tbody>
+</table><br/>
+
+Getting the match data for the top 10 ranked teams is a bit more complicated. We need to store all ten of the team names and URLs into arrays. A for loop allows us to iterate through and parse the HTML data from all URLs, storing it into one unified data frame.<br/><br/>
+
+<pre class="jptrstyle"><code class="python">i = 0
+masterDF = pd.DataFrame()
+
+# Top teams
+topTeamCountries = ['Brazil', 'EU', 'Denmark', 'Sweden', 'North America', 'France', 'Denmark', 'Russia', 'Sweden', 'North America']
+
+# Top team URLS (for scraping match data)
+topTeamMatches = ['https://www.hltv.org/stats/teams/matches/6137/SK', 'https://www.hltv.org/stats/teams/matches/6667/FaZe', \
+                    'https://www.hltv.org/stats/teams/matches/6665/Astralis', 'https://www.hltv.org/stats/teams/matches/4411/NiP', \
+                    'https://www.hltv.org/stats/teams/matches/5752/Cloud9', 'https://www.hltv.org/stats/teams/matches/5995/G2', \
+                    'https://www.hltv.org/stats/teams/matches/7533/North?startDate=2017-01-01&endDate=2017-12-31', 'https://www.hltv.org/stats/teams/matches/5378/Virtus.pro', \
+                    'https://www.hltv.org/stats/teams/matches/4991/fnatic', 'https://www.hltv.org/stats/teams/matches/5973/Liquid']
+
+# Go through each of the top 10 teams match data, sanitize/clean it, and throw the match data into one unified master dataframe
+for team in topTeamMatches :
+
+    # Pull/scrape/parse data
+    r = requests.get(team)
+    root = bs(r.content, "html.parser")
+    root.prettify()
+    table = (str)(root.find("table"))
+    SK = pd.read_html(table, header=0)[0]
+
+    # Give columns proper names
+    SK.columns = ['Date', 'Event', 'Opponent', 'Map', 'Rating', 'W/L', 'Outcome']
+
+    # Clean win/loss data and turn to numeric format for compatibilty with machine learning classifier
+    SK.loc[SK.Outcome == 'W', 'Outcome'] = 1
+    SK.loc[SK.Outcome == 'L', 'Outcome'] = 0
+    SK.loc[SK.Outcome == 'T', 'Outcome'] = 0
+
+    # Misc sanitation (datetime conversion, typecasting)
+    SK['Outcome'] = SK['Outcome'].astype(str).astype(int)
+    SK['Event'] = SK['Event'].astype(str)
+    SK['Date'] = pd.to_datetime(SK['Date'])
+    SK['Year'] = SK['Date'].dt.year
+    SK['Team'] = topTeams[i]
+    masterDF = masterDF.append(SK)
+    i += 1
+
+# Reset indexes so that they are from 0 to N instead of being random jumbled numbers
+masterDF = masterDF.reset_index(drop=True)
+
+# Drop unneeded colums and clean up names of other columns
+masterDF = masterDF.drop(['Event', 'Opponent'], axis=1)
+masterDF = masterDF.rename(index=str, columns={"Map" : "Opponent", "Rating" : "Map"})
+cols = masterDF.columns.tolist()
+cols = cols[-1:] + cols[:-1]
+masterDF = masterDF[cols]
+
+# Print resultant dataframe of all merged together top 10 team historic match results
+masterDF</code></pre><br/>
+
+<table border="1" class="dataframe">
+  <thead class="thead-inverse">
+    <tr style="text-align: right;" class="tr-top">
+      <th></th>
+      <th>Team</th>
+      <th>Date</th>
+      <th>Opponent</th>
+      <th>Map</th>
+      <th>W/L</th>
+      <th>Outcome</th>
+      <th>Year</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>SK</td>
+      <td>2018-01-19</td>
+      <td>Space Soldiers</td>
+      <td>Mirage</td>
+      <td>16 - 13</td>
+      <td>1</td>
+      <td>2018</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>SK</td>
+      <td>2017-10-12</td>
+      <td>FaZe</td>
+      <td>Train</td>
+      <td>19 - 16</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>SK</td>
+      <td>2017-10-12</td>
+      <td>FaZe</td>
+      <td>Mirage</td>
+      <td>16 - 9</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>SK</td>
+      <td>2017-10-12</td>
+      <td>FaZe</td>
+      <td>Overpass</td>
+      <td>16 - 11</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>SK</td>
+      <td>2017-10-12</td>
+      <td>FaZe</td>
+      <td>Inferno</td>
+      <td>13 - 16</td>
+      <td>0</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>SK</td>
+      <td>2017-09-12</td>
+      <td>Misfits</td>
+      <td>Overpass</td>
+      <td>16 - 1</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>SK</td>
+      <td>2017-09-12</td>
+      <td>Misfits</td>
+      <td>Cobblestone</td>
+      <td>16 - 6</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>SK</td>
+      <td>2017-06-12</td>
+      <td>Misfits</td>
+      <td>Cache</td>
+      <td>16 - 7</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>SK</td>
+      <td>2017-06-12</td>
+      <td>NRG</td>
+      <td>Cache</td>
+      <td>16 - 9</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>SK</td>
+      <td>2017-06-12</td>
+      <td>NiP</td>
+      <td>Overpass</td>
+      <td>16 - 9</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>SK</td>
+      <td>2017-05-12</td>
+      <td>OpTic</td>
+      <td>Mirage</td>
+      <td>14 - 16</td>
+      <td>0</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>SK</td>
+      <td>2017-05-12</td>
+      <td>North</td>
+      <td>Overpass</td>
+      <td>16 - 7</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>SK</td>
+      <td>2017-11-25</td>
+      <td>Astralis</td>
+      <td>Cache</td>
+      <td>19 - 16</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>SK</td>
+      <td>2017-11-25</td>
+      <td>Astralis</td>
+      <td>Inferno</td>
+      <td>16 - 8</td>
+      <td>1</td>
+      <td>2017</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>SK</td>
+      <td>2017-11-25</td>
+      <td>Astralis</td>
+      <td>Mirage</td>
+      <td>11 - 16</td>
+      <td>0</td>
+      <td>2017</td>
+    </tr>
+  </tbody>
+</table><br/>
+
+<h3>Visualization</h3>
+Visualization is an invaluable tool in the world of data science. It helps people understand data trends more efficiently than sifting through raw numbers. Pandas and pyplot make graphical data representation very easy.
+
+<br/><br/><pre class="jptrstyle"><code class="python"># Compute standardized Kill/Death ratio for every country using groupby clauses
+g = teams.groupby("Country")
+kd = g.mean()['K/D']
+avg = kd.mean()
+std = kd.std()
+normalized_kd = []
+for c in kd:
+    normalized_kd.append((c-avg)/std)
+
+ts = teams['Country'].sort_values().unique()
+temp = pd.DataFrame({'teams': ts, 'kd': normalized_kd})
+
+print("Average kill/death ratio of teams given: ", avg)
+
+# Create scatter plot of team win ratio (by country)
+ax = temp.plot(kind='bar',x='teams',y='kd', title='Scatter Plot of Team Win Ratio Color Coded (By Country)', width = 1)
+ax.set_xlabel('Country')
+ax.set_ylabel('Standardized Kill/Death Ratio')
+plt.show()
+</code></pre><br/>
+
+<pre class="output">Average kill/death ratio of teams given:  1.045059523809524</pre><br/>
+
+<img src="plot1.png"><br/><br/>
+
+This plot shows us that Russia has currently been struggling while countries such as Turkey and Sweden have been prospering. The average kill/death ratio for the teams analyzed above exceeds 1 since we are only processing data for the upper echelon of teams from their countries. More precisely, countries without teams in the upper 30% of kill/death ratios are not represented.<br/><br/>
+Next is a visual representation of the top 10 team win rates.<br/><br/>
+
+<pre class="jptrstyle"><code class="python"># Get Outcome groups for Team, Year
+chanz = masterDF.groupby(['Team','Year'])['Outcome'].mean()
+cha = chanz.to_frame()
+cha['o'] = chanz.index.get_level_values('Team')
+cha['f'] = chanz.index.get_level_values('Year')
+
+cha = cha.reset_index(drop=True)
+cha = cha.rename(columns={'Outcome': 'Outcome', 'o': 'Team', 'f': 'Year'})
+
+# Group by team and get unique
+ts = cha.groupby('Team')
+names = ts['Team'].unique()
+flat_names = [item for sublist in names for item in sublist]
+
+# Format plot
+plt.figure(figsize=(20,10))
+plt.xlim(2013,2017)
+plt.ylim(.4, .82)
+plt.title("Winrate per year of top 10 teams")
+plt.ylabel('Winrate')
+plt.xlabel('Year')
+
+# Plot for each team
+for k,v in ts:
+    plt.plot(v['Year'], v['Outcome'],marker='o')
+
+plt.legend(flat_names, ncol=5, prop={'size': 20})
+
+# Show aformentioned plot
+plt.show()
+
+# Print out significant data about NiP
+wrs = ts.get_group('NiP')['Outcome'].tolist()
+years = ['2012','2013','2014','2015','2016','2017']
+
+for i in range(0,6):
+    print("NiP winrate in", years[i], ": ", wrs[i])
+</code></pre><br/>
+
+<img src="plot2.png" style="width:80%;"><br/><br/>
+
+<pre class="output">
+NiP win rate in 2012: 0.9843750000000000
+NiP win rate in 2013: 0.8053435114503816
+NiP win rate in 2014: 0.6026785714285714
+NiP win rate in 2015: 0.6028368794326241
+NiP win rate in 2016: 0.6206896551724138
+NiP win rate in 2017: 0.5228426395939086
+</pre>
+
+<br/>The most significant conclusion that can be made at first glance is that NiP's performance dropped dramatically after their 2012 legendary record of 87 wins to 0 losses. NiP has been in decline ever since. It is also clear that SK's performance during 2015 and every subsequent year has been phenomenal and continues to improve. The significant shifts in performance of these two teams are best explained by major team roster changes.<br/><br/>
+
+A player’s kill/death differential is calculated by subtracting kills from deaths. It documents the quantity of kills and deaths whereas the kill/death ratio only provides a success rate. As in other sports, Counter-Strike teams often include star players who consistently make high contributions to their team. Having a graphical representation of a team’s mean kill/death differential and the team’s top player’s kill/death differential makes for quick comparisons.<br/><br/>
+
+Means and maxes of the kill/death differential for each team can be obtained by using Pandas group by clauses. Mean and maximum kill/death differentials are printed above the graph for clarity.<br/><br/>
+
+<pre class="jptrstyle"><code class="python">means = []
+maxs = []
+teams = players['Team'].sort_values().unique()
+stuff = players.groupby('Team')
+
+# Get the means and maxes from the groups and format the columns
+means = stuff.mean()
+maxs = stuff.max()
+means.columns = ['Maps', 'K/D Diff', 'K/D', 'Rating']
+maxs.columns = ['Player', 'Maps', 'K/D Diff', 'K/D', 'Rating']
+
+# Print the data I got
+print("Means of K/D Difference per team\n", means['K/D Diff'])
+print("\nMaxs of K/D Difference per team\n", maxs['K/D Diff'])
+
+# Plot the bar graph with means as blue and maxs as green
+ax = plt.subplot(111)
+ax.bar([.8,1.8,2.8,3.8,4.8,5.8,6.8,7.8,8.8,9.8], means['K/D Diff'], width=0.3,color='b',align='center')
+ax.bar([1.2,2.2,3.2,4.2,5.2,6.2,7.2,8.2,9.2,10.2], maxs['K/D Diff'],width=0.3,color='g',align='center')
+plt.xticks([1,2,3,4,5,6,7,8,9,10], teams, rotation='vertical')
+
+# Graph formatting
+ax.set_ylim([0, 5000])
+ax.legend(['Mean', 'Max'])
+plt.title("Average K/D Differential vs max K/D Differential per team")
+plt.ylabel('K/D Differential')
+plt.xlabel('Team')
+
+plt.show()
+
+me = means['K/D Diff'].tolist()
+ma = maxs['K/D Diff'].tolist()
+
+# Print the differences in the star player vs mean players
+print("How much better each teams best player did versus average of players on the team")
+for i in range(len(me)):
+    c = (me[i]/ma[i])*100
+    print(teams[i], ": %.2f" %c, "%")
+</code></pre><br/>
+
+<img src="plot3.png"><br/><br/>
+
+<pre class="output">
+<strong>Means of K/D Difference per team</strong>
+Astralis      2049.0
+Cloud9        1351.0
+FaZe          1976.6
+G2            2202.4
+Liquid         830.6
+NiP           2667.4
+North          700.2
+SK            1910.6
+Virtus.pro    1165.8
+fnatic        1592.6
+
+<strong>Maximums of K/D Difference per team</strong>
+Astralis      3942
+Cloud9        2310
+FaZe          3998
+G2            4871
+Liquid        1533
+NiP           5009
+North         2616
+SK            3711
+Virtus.pro    2191
+fnatic        2987
+
+<strong>How much better the star player(s) did versus average of players on the team</strong>
+Astralis      51.98%
+Cloud9        58.48%
+FaZe          49.44%
+G2            45.21%
+Liquid        54.18%
+NiP           53.25%
+North         26.77%
+SK            51.48%
+Virtus.pro    53.21%
+fnatic        53.32%
+</pre><br/>
+
+Star players are undoubtedly the most skilled players on their team but sometimes not by a large margin. Teams intentionally give their star players the best opportunities which causes them to increasingly surpass the measurable performance of their teammates. It is easy to recognize that North is a team in which 3 to 4 players perform well, and no real star player exists.<br/><br/>
+
+<h3>Machine Learning</h3>
+
+Machine learning enables us to predict future match performance. We will analyze high performing teams in clusters grouped by country. The linear support vector learning classifier is very powerful and will lend itself well to this task. Since SVMs only accept numerical data input, match dates need to be converted into <a href="https://en.wikipedia.org/wiki/Ordinal_date">ordinal format</a> before being passed into SKLearn.
+
+SKLearn will handle all the heavy lifting. We will give SKLearn the training data, perform a 10-point cross validation, and plot the learning curve of our classifier below. The cross mean and standard error we generate demonstrates how effectively the machine learning classifier is operating.<br/><br/>
+
+<pre class="jptrstyle"><code class="python"># Convert datetime data to ordinal format so it can be used in our machine learning classisfier
+masterDF['Date'] = masterDF['Date'].apply(lambda x: x.toordinal())
+
+# A function that plots a learning curve of a given machine learning classifier (provided by SKLearn documentation)
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
+                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+    plt.figure()
+    plt.title(title)
+    if ylim is not None:
+        plt.ylim(*ylim)
+    plt.xlabel("Training examples")
+    plt.ylabel("Score")
+    train_sizes, train_scores, test_scores = learning_curve(
+        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    plt.grid()
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+             label="Training score")
+
+    plt.legend(loc="best")
+    return plt
+
+# Lump groups of countries together for machine learning purposes
+europe = masterDF[(masterDF.Team == 'Astralis') | (masterDF.Team == 'North') | (masterDF.Team == 'G2') | (masterDF.Team == 'FaZe')]
+america = masterDF[(masterDF.Team == 'C9') | (masterDF.Team == 'Liquid') | (masterDF.Team == 'SK')]
+sweden = masterDF[(masterDF.Team == 'NiP') | (masterDF.Team == 'fnatic')]
+
+# Create SKlearn machine learning classifier
+eursvc = svm.SVC()
+amersvc = svm.SVC()
+swedsvc = svm.SVC()
+
+# Give the machine learning classifiers the training data
+eursvc.fit(europe.Date.values.reshape((len(europe),1)), europe.Outcome)
+amersvc.fit(america.Date.values.reshape((len(america),1)), america.Outcome)
+swedsvc.fit(sweden.Date.values.reshape((len(sweden),1)), sweden.Outcome)
+
+# Perform a cross validation analysis on each of the three country group classifiers
+europesvm = cross_val_score(eursvc, europe.Date.values.reshape((len(europe),1)), europe.Outcome, cv=10)
+americasvm = cross_val_score(amersvc, america.Date.values.reshape((len(america),1)), america.Outcome, cv=10)
+swedensvm = cross_val_score(swedsvc, sweden.Date.values.reshape((len(sweden),1)), sweden.Outcome, cv=10)
+
+# Perform a 10 point cross validation on Europe group
+print ("Linear SVM 10 Point Cross Validation On Europe Data")
+print(europesvm)
+print ("\n")
+
+# Perform a 10 point cross validation on America group
+print ("Linear SVM 10 Point Cross Validation On America Data")
+print(americasvm)
+print ("\n")
+
+# Perform a 10 point cross validation on Sweden group
+print ("Linear SVM 10 Point Cross Validation On Sweden Data")
+print(swedensvm)
+print("\n")
+
+# Cross mean and standard error stats for each country under SVM classifier
+print ("Linear SVM Cross Mean and Standard Error For Europe Data")
+print("Accuracy: %0.2f (+/- %0.2f)" % (europesvm.mean(), europesvm.std() * 2))
+print("\n")
+
+print ("Linear SVM Cross Mean and Standard Error For America Data")
+print("Accuracy: %0.2f (+/- %0.2f)" % (americasvm.mean(), americasvm.std() * 2))
+print("\n")
+
+print ("Linear SVM Cross Mean and Standard Error For Sweden Data")
+print("Accuracy: %0.2f (+/- %0.2f)" % (swedensvm.mean(), swedensvm.std() * 2))
+
+# Plot the learning curves for each of the three country groups
+plot_learning_curve(eursvc, "Europe", europe.Date.values.reshape((len(europe),1)), europe.Outcome, ylim=(0.7, 1.01), cv=10, n_jobs=4)
+plot_learning_curve(amersvc, "America", america.Date.values.reshape((len(america),1)), america.Outcome, ylim=(0.7, 1.01), cv=10, n_jobs=4)
+plot_learning_curve(swedsvc, "Sweden", sweden.Date.values.reshape((len(sweden),1)), sweden.Outcome, ylim=(0.7, 1.01), cv=10, n_jobs=4)
+
+# Show the learning curves
+plt.show()</code></pre><br/>
+
+<pre class="output">
+Linear SVM 10 Point Cross Validation On European Data
+[0.49714286, 0.52, 0.42857143, 0.48, 0.44, 0.40804598,
+ 0.45977011, 0.49132948, 0.40462428, 0.54913295]
+
+Linear SVM 10 Point Cross Validation On American Data
+[0.46308725, 0.34459459, 0.27027027, 0.27027027, 0.30612245, 0.4829932
+ 0.49659864, 0.50340136, 0.5170068, 0.49659864]
+
+Linear SVM 10 Point Cross Validation On Swedish Data
+[0.42672414, 0.51948052, 0.41125541, 0.23809524, 0.59307359, 0.58008658
+ 0.53913043, 0.52608696, 0.53913043, 0.53043478]
+
+Linear SVM Cross Mean and Standard Error For Europe Data
+Accuracy: 0.47 (+/- 0.09)
+
+Linear SVM Cross Mean and Standard Error For America Data
+Accuracy: 0.42 (+/- 0.20)
+
+Linear SVM Cross Mean and Standard Error For Sweden Data
+Accuracy: 0.49 (+/- 0.20)
+
+<img src="plot4.png">
+
+<img src="plot5.png">
+
+<img src="plot6.png">
+</pre><br/>
+
+Since machine learning works best when provided with large quantities of data, we will cluster together all-star teams from Europe, America, and Sweden. Europe's top teams are Astralis, North, G2, and FaZe. America's top teams are C9, Liquid, and SK. Sweden's top teams are NiP and fnatic.<br/><br/>
+
+Our classifiers can predict win/loss ratios for the next 250 games that each country cluster plays. Unsurprisingly, Sweden is projected to continue to dominate the sport.<br/><br/>
+
+<pre class="jptrstyle"><code class="python"># Initialize win count variables for each predicition
+ewincount = 0
+awincount = 0
+swincount = 0
+
+# Calculate the each country group amount of wins for the next 250 games
+for x in range(735621, 735871):
+    if eursvc.predict([[x]]) == [1] :
+        ewincount += 1
+
+for x in range(735621, 735871):
+    if amersvc.predict([[x]]) == [1] :
+        awincount += 1
+print (awincount)
+
+for x in range(735621, 735871):
+    if swedsvc.predict([[x]]) == [1] :
+        swincount += 1
+
+# Output Europe group predicition results
+print("Predicted Outcome of Next 250 Games By Best European Teams (Astralis, North, G2, and FaZe)")
+plt.pie([ewincount, 250-ewincount], explode=(0, 0), labels=['Wins', 'Losses'], colors=['limegreen', 'red'],
+        autopct='%1.1f%%', shadow=False, startangle=140)
+plt.axis('equal')
+plt.show()
+
+# Output America group predicition results
+print("Predicted Outcome of Next 250 Games By Best American Teams (C9, Liquid, and SK)")
+plt.pie([awincount, 250-awincount], explode=(0, 0), labels=['Wins', 'Losses'], colors=['limegreen', 'red'],
+        autopct='%1.1f%%', shadow=False, startangle=140)
+plt.axis('equal')
+plt.show()
+
+# Output Sweden group predicition results
+print("Predicted Outcome of Next 250 Games By Best Swedish Teams (NiP and fnatic)")
+plt.pie([swincount, 250-swincount], explode=(0, 0), labels=['Wins', 'Losses'], colors=['limegreen', 'red'],
+        autopct='%1.1f%%', shadow=False, startangle=140)
+plt.axis('equal')
+plt.show()
+
+</code></pre><br/>
+
+<pre class="output">
+Predicted Outcome of Next 250 Games By Best European Teams (Astralis, North, G2, and FaZe)
+
+  <img src="plot7.png">
+
+
+Predicted Outcome of Next 250 Games By Best American Teams (C9, Liquid, and SK)
+
+  <img src="plot8.png">
+
+
+Predicted Outcome of Next 250 Games By Best Swedish Teams (NiP and fnatic)
+
+  <img src="plot9.png"></pre><br/>
+
+<center><strong class="conclusion">That's it! I hope you enjoyed following my introductory tutorial on data scraping, data sanitization, data visualization, and machine learning. A pre-made Jupyter notebook version of this tutorial can be <a href="https://github.com/agusterodin/CSGO-Stat-Analysis/blob/master/esportstutorial.ipynb">found here</a>. Happy scraping!</strong></center>
+<br/>
+<center>
+  Created by <a href="https://github.com/agusterodin">Jeffrey Rosen</a></center><br/>
+</center>
+</body>
+</html>
+<!DOCTYPE html> 
